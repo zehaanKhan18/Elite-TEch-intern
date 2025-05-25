@@ -1,0 +1,60 @@
+# ETL Pipeline for Data Preprocessing using Pandas and Scikit-learn
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+import seaborn as sns
+import os
+
+# Step 1: Extract (Load Data)
+data = sns.load_dataset('titanic')
+print("Original Data Shape:", data.shape)
+
+# Step 2: Define Features and Target
+X = data.drop(columns=['survived'])
+y = data['survived']
+
+# Step 3: Identify column types
+numeric_features = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
+categorical_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
+
+# Step 4: Define Preprocessing Pipelines
+numeric_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='median')),
+    ('scaler', StandardScaler())
+])
+
+categorical_transformer = Pipeline(steps=[
+    ('imputer', SimpleImputer(strategy='most_frequent')),
+    ('onehot', OneHotEncoder(handle_unknown='ignore'))
+])
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', numeric_transformer, numeric_features),
+        ('cat', categorical_transformer, categorical_features)
+    ])
+
+# Step 5: Combine Preprocessor and Split Data
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+pipeline = Pipeline(steps=[
+    ('preprocessor', preprocessor)
+])
+
+X_train_transformed = pipeline.fit_transform(X_train)
+X_test_transformed = pipeline.transform(X_test)
+
+# Step 6: Save Processed Data
+output_dir = "processed_data"
+os.makedirs(output_dir, exist_ok=True)
+
+pd.DataFrame(X_train_transformed.toarray() if hasattr(X_train_transformed, 'toarray') else X_train_transformed).to_csv(os.path.join(output_dir, 'X_train.csv'), index=False)
+pd.DataFrame(X_test_transformed.toarray() if hasattr(X_test_transformed, 'toarray') else X_test_transformed).to_csv(os.path.join(output_dir, 'X_test.csv'), index=False)
+y_train.to_csv(os.path.join(output_dir, 'y_train.csv'), index=False)
+y_test.to_csv(os.path.join(output_dir, 'y_test.csv'), index=False)
+
+print("ETL Pipeline completed. Processed files saved in 'processed_data/' folder.")
