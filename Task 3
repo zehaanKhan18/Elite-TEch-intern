@@ -1,0 +1,48 @@
+# iris_flower_api.py
+
+from flask import Flask, request, jsonify
+import numpy as np
+import joblib
+from sklearn.datasets import load_iris
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import os
+
+app = Flask(__name__)
+
+MODEL_PATH = "iris_model.pkl"
+
+# Train and save model if not already trained
+def train_model():
+    iris = load_iris()
+    X_train, X_test, y_train, y_test = train_test_split(iris.data, iris.target, test_size=0.2, random_state=42)
+    model = RandomForestClassifier(n_estimators=100, random_state=42)
+    model.fit(X_train, y_train)
+    joblib.dump(model, MODEL_PATH)
+    print("Model trained and saved.")
+
+# Load the model
+def load_model():
+    if not os.path.exists(MODEL_PATH):
+        train_model()
+    return joblib.load(MODEL_PATH)
+
+model = load_model()
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    try:
+        data = request.get_json()
+        features = np.array(data["features"]).reshape(1, -1)
+        prediction = model.predict(features)
+        return jsonify({"prediction": int(prediction[0])})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/", methods=["GET"])
+def home():
+    return "Iris Flower Prediction API"
+
+if __name__ == "__main__":
+    app.run(debug=True)
