@@ -1,0 +1,100 @@
+const express = require('express');
+const fs = require('fs');
+const path = require('path');
+const app = express();
+
+const PORT = process.env.PORT || 3000;
+const DATA_FILE = path.join(__dirname, 'books.json');
+
+app.use(express.json());
+
+// Utility function to read books data from JSON file
+function readBooks() {
+  try {
+    const data = fs.readFileSync(DATA_FILE, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    return [];
+  }
+}
+
+// Utility function to write books data to JSON file
+function writeBooks(books) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify(books, null, 2));
+}
+
+// GET /books - Retrieve all books
+app.get('/books', (req, res) => {
+  const books = readBooks();
+  res.json(books);
+});
+
+// POST /books - Create a new book
+app.post('/books', (req, res) => {
+  const { title, author, price, publishedDate } = req.body;
+
+  if (!title || !author || price === undefined || !publishedDate) {
+    return res.status(400).json({ error: 'Missing required book fields' });
+  }
+
+  const books = readBooks();
+  const newBook = {
+    id: books.length > 0 ? books[books.length - 1].id + 1 : 1,
+    title,
+    author,
+    price,
+    publishedDate,
+  };
+
+  books.push(newBook);
+  writeBooks(books);
+
+  res.status(201).json(newBook);
+});
+
+// PUT /books/:id - Update an existing book
+app.put('/books/:id', (req, res) => {
+  const bookId = parseInt(req.params.id);
+  const { title, author, price, publishedDate } = req.body;
+
+  const books = readBooks();
+  const bookIndex = books.findIndex(b => b.id === bookId);
+
+  if (bookIndex === -1) {
+    return res.status(404).json({ error: 'Book not found' });
+  }
+
+  const updatedBook = { ...books[bookIndex] };
+
+  if (title !== undefined) updatedBook.title = title;
+  if (author !== undefined) updatedBook.author = author;
+  if (price !== undefined) updatedBook.price = price;
+  if (publishedDate !== undefined) updatedBook.publishedDate = publishedDate;
+
+  books[bookIndex] = updatedBook;
+  writeBooks(books);
+
+  res.json(updatedBook);
+});
+
+// DELETE /books/:id - Delete a book
+app.delete('/books/:id', (req, res) => {
+  const bookId = parseInt(req.params.id);
+
+  const books = readBooks();
+  const bookIndex = books.findIndex(b => b.id === bookId);
+
+  if (bookIndex === -1) {
+    return res.status(404).json({ error: 'Book not found' });
+  }
+
+  books.splice(bookIndex, 1);
+  writeBooks(books);
+
+  res.status(204).send();
+});
+
+app.listen(PORT, () => {
+  console.log(\`Book Store API running on port \${PORT}\`);
+});
+
